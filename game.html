@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>炫酷版猜数字小游戏</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #4CAF50; /* 绿色系主色调 */
+            --secondary-color: #2196F3; /* 蓝色系辅助色调 */
+            --accent-color: #FFC107; /* 黄色系强调色 */
+            --text-color: #333;
+            --light-bg: #e0f2f1; /* 浅背景 */
+            --dark-bg: #80CBC4; /* 深背景 */
+            --error-color: #F44336;
+            --success-color: #4CAF50;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            /* 动态背景渐变 */
+            background: linear-gradient(45deg, var(--light-bg), var(--dark-bg), var(--light-bg));
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite; 
+            overflow: hidden; 
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .game-container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 450px;
+            position: relative; 
+            z-index: 10; 
+            transition: transform 0.3s ease-in-out; 
+        }
+        
+        /* 抖动动画 */
+        .game-container.shake {
+            animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 25px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        p {
+            color: var(--text-color);
+            font-size: 1.1em;
+        }
+
+        input[type="number"] {
+            padding: 12px 15px;
+            margin: 20px 0;
+            width: calc(70% - 30px);
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            font-size: 1.2em;
+            text-align: center;
+            transition: all 0.3s ease; 
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 输入框焦点动画 */
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 15px rgba(33, 150, 243, 0.5); 
+            transform: scale(1.02); 
+        }
+
+        button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.2s ease; 
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            margin: 0 5px; 
+        }
+
+        /* 按钮交互动画 */
+        button:hover {
+            background-color: #1976D2; 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: scale(0.95) translateY(1px); 
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        #resetButton {
+            background-color: var(--success-color);
+        }
+
+        #resetButton:hover {
+            background-color: #388E3C;
+        }
+
+        #feedback {
+            margin-top: 30px;
+            font-size: 1.4em;
+            font-weight: bold;
+            color: var(--text-color);
+            min-height: 40px; 
+            opacity: 0; 
+            transform: translateY(20px); 
+            /* 反馈信息弹出动画 */
+            animation: feedback-slide-in 0.5s ease-out forwards; 
+            transition: color 0.5s ease; 
+        }
+
+        @keyframes feedback-slide-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #guesses {
+            margin-top: 15px;
+            font-size: 1em;
+            color: #777;
+            opacity: 0.8;
+        }
+
+        /* 彩带容器 */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            z-index: 5; 
+            overflow: hidden; 
+        }
+
+        /* 单个彩带动画 */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+            animation: fall 3s ease-out forwards;
+            border-radius: 50%; 
+        }
+
+        @keyframes fall {
+            0% { transform: translate(0, -100px) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--x), var(--y)) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <div class="game-container">
+        <h1>猜数字 (1-100)</h1>
+        <p>输入你的猜测，然后点击“提交”。</p>
+
+        <input type="number" id="guessInput" min="1" max="100" placeholder="在此输入你的数字">
+        <button id="submitButton">提交</button>
+        <button id="resetButton" style="display: none;">重置游戏</button>
+
+        <div id="feedback"></div>
+        <div id="guesses">你已经猜了 0 次。</div>
+    </div>
+
+    <script>
+        // 游戏逻辑变量
+        let secretNumber = Math.floor(Math.random() * 100) + 1;
+        let guessCount = 0;
+        
+        // 获取 DOM 元素
+        const guessInput = document.getElementById('guessInput');
+        const submitButton = document.getElementById('submitButton');
+        const resetButton = document.getElementById('resetButton');
+        const feedbackDiv = document.getElementById('feedback');
+        const guessesDiv = document.getElementById('guesses');
+        const gameContainer = document.querySelector('.game-container');
+        const confettiContainer = document.getElementById('confettiContainer');
+
+        // 事件监听
+        submitButton.addEventListener('click', checkGuess);
+        guessInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                checkGuess();
+            }
+        });
+        resetButton.addEventListener('click', resetGame);
+
+        // 核心游戏逻辑函数
+        function checkGuess() {
+            const userGuess = parseInt(guessInput.value);
+
+            // 重置反馈动画（关键：每次调用前重置，才能重复触发动画）
+            feedbackDiv.style.animation = 'none';
+            feedbackDiv.offsetHeight; // 强制浏览器重绘
+            feedbackDiv.style.animation = null; 
+
+            if (isNaN(userGuess) || userGuess < 1 || userGuess > 100) {
+                feedbackDiv.textContent = '请输入一个 1 到 100 之间的有效数字！';
+                feedbackDiv.style.color = 'var(--error-color)';
+                gameContainer.classList.add('shake'); // 输入无效时抖动
+                setTimeout(() => gameContainer.classList.remove('shake'), 300);
+                return;
+            }
+
+            guessCount++;
+            guessesDiv.textContent = `你已经猜了 ${guessCount} 次。`;
+            guessInput.value = ''; // 清空输入框
+
+            // 判断猜测结果
+            if (userGuess === secretNumber) {
+                feedbackDiv.textContent = `🎉 恭喜你！猜对了！秘密数字就是 ${secretNumber}。你一共猜了 ${guessCount} 次。`;
+                feedbackDiv.style.color = 'var(--success-color)';
+                gameOver();
+                triggerConfetti(); // 触发彩带动画
+            } else if (userGuess < secretNumber) {
+                feedbackDiv.textContent = '❌ 太小了！再往大一点猜。';
+                feedbackDiv.style.color = 'var(--error-color)';
+                gameContainer.classList.add('shake'); // 猜错时抖动
+                setTimeout(() => gameContainer.classList.remove('shake'), 300);
+            } else {
+                feedbackDiv.textContent = '❌ 太大了！再往小一点猜。';
+                feedbackDiv.style.color = 'var(--error-color)';
+                gameContainer.classList.add('shake'); // 猜错时抖动
+                setTimeout(() => gameContainer.classList.remove('shake'), 300);
+            }
+        }
+
+        // 游戏结束处理
+        function gameOver() {
+            guessInput.disabled = true;
+            submitButton.style.display = 'none';
+            resetButton.style.display = 'inline-block';
+            feedbackDiv.style.color = 'var(--success-color)';
+        }
+
+        // 重置游戏函数
+        function resetGame() {
+            secretNumber = Math.floor(Math.random() * 100) + 1;
+            guessCount = 0;
+
+            guessInput.disabled = false;
+            submitButton.style.display = 'inline-block';
+            resetButton.style.display = 'none';
+            feedbackDiv.textContent = '';
+            guessesDiv.textContent = '你已经猜了 0 次。';
+            feedbackDiv.style.color = 'var(--text-color)';
+            guessInput.value = '';
+            confettiContainer.innerHTML = ''; // 清除彩带
+        }
+
+        // 触发彩带动画
+        function triggerConfetti() {
+            const colors = ['#FFC107', '#4CAF50', '#2196F3', '#E91E63', '#9C27B0']; // 彩带颜色
+            for (let i = 0; i < 50; i++) { // 生成50片彩带
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                confetti.style.left = `${Math.random() * 100}vw`; 
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)]; 
+                
+                // 使用 CSS 变量来控制彩带的随机落点和偏移
+                confetti.style.setProperty('--x', `${(Math.random() - 0.5) * 500}px`); 
+                confetti.style.setProperty('--y', `${(Math.random() * window.innerHeight) + 500}px`); 
+                
+                confetti.style.animationDelay = `${Math.random() * 0.5}s`;
+                confettiContainer.appendChild(confetti);
+            }
+            // 3秒后清理彩带元素
+            setTimeout(() => {
+                confettiContainer.innerHTML = '';
+            }, 3000); 
+        }
+    </script>
+</body>
+</html>
