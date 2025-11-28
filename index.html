@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Gesture Particle Effect</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #webcam {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0; /* 隐藏摄像头画面，只用于MediaPipe处理 */
+            transform: scaleX(-1); /* 镜像，让用户感觉更自然 */
+        }
+        #outputCanvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="outputCanvas"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script> 
+
+    <script type="module">
+
+
+        const videoElement = document.getElementById('webcam');
+        const outputCanvas = document.getElementById('outputCanvas');
+        const ctx = outputCanvas.getContext('2d');
+
+        let cameraInitialized = false;
+        let handLandmarks = null; // 用于存储手部关键点
+
+        // --- Three.js Setup ---
+        let scene, camera, renderer, particles;
+        const particleCount = 1000;
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ canvas: outputCanvas, alpha: true }); // alpha: true 允许背景透明
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Create particles
+            const geometry = new THREE.BufferGeometry();
+
+            for (let i = 0; i < particleCount; i++) {
+                // Initial random positions
+                positions[i * 3 + 0] = (Math.random() - 0.5) * 10;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+
+                // Initial random colors
+                colors[i * 3 + 0] = Math.random();
+                colors[i * 3 + 1] = Math.random();
+                colors[i * 3 + 2] = Math.random();
+
+                // Initial random sizes
+                sizes[i] = Math.random() * 0.5 + 0.1;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.1, // Overall size factor
+                vertexColors: true, // Use colors from BufferAttribute
+                transparent: true,
+                blending: THREE.AdditiveBlending, // Create glowing effect
+                sizeAttenuation: true // Particles closer to camera are larger
+            });
+
+            // For custom size per particle, use a ShaderMaterial
+            // const shaderMaterial = new THREE.ShaderMaterial({
+            //     uniforms: {
+            //         pointTexture: { value: new THREE.TextureLoader().load('path/to/particle.png') } // Optional: custom particle texture
+            //     },
+            //     vertexShader: `
+            //         attribute float size;
+            //         attribute vec3 color;
+            //         varying vec3 vColor;
+            //         void main() {
+            //             vColor = color;
+            //             vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+            //             gl_PointSize = size * ( 300.0 / -mvPosition.z );
+            //             gl_Position = projectionMatrix * mvPosition;
+            //         }
+            //     `,
+            //     fragmentShader: `
+            //         varying vec3 vColor;
+            //         void main() {
+            //             gl_FragColor = vec4( vColor, 1.0 );
+            //         }
+            //     `,
+            //     blending: THREE.AdditiveBlending,
+            //     transparent: true
+            // });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            camera.position.z = 5;
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate particles for demo
+            particles.rotation.x += 0.001;
+            particles.rotation.y += 0.002;
+
+            // --- Particle Generation/Movement Logic Here ---
+            // This is where you would update particle positions based on handLandmarks
+            // Example: Move a few particles towards the latest handLandmark position
+            if (handLandmarks && handLandmarks.length > 0) {
+                const landmark = handLandmarks[0].landmarks[8]; // Example: Index finger tip (adjust as needed)
+                // Convert MediaPipe normalized coordinates to Three.js world coordinates
+                const normalizedX = (landmark.x - 0.5) * 2;
+                const normalizedY = -(landmark.y - 0.5) * 2; // Y-axis is inverted
+                const targetPosition = new THREE.Vector3(normalizedX * (window.innerWidth / window.innerHeight) * camera.position.z / 5, normalizedY * camera.position.z / 5, 0);
+
+                // For a simple demo, let's just make the entire particle system follow a landmark
+                // In a real app, you'd spawn new particles at this point
+                // particles.position.set(targetPosition.x, targetPosition.y, 0);
+
+                // Or, update a few specific particles
+                const particlePositions = particles.geometry.attributes.position.array;
+                const speed = 0.05;
+                for (let i = 0; i < 3; i++) { // Update first 3 particles
+                    particlePositions[i * 3 + 0] += (targetPosition.x - particlePositions[i * 3 + 0]) * speed;
+                    particlePositions[i * 3 + 1] += (targetPosition.y - particlePositions[i * 3 + 1]) * speed;
+                    // particlePositions[i * 3 + 2] += (targetPosition.z - particlePositions[i * 3 + 2]) * speed; // If you want 3D tracking
+                }
+                particles.geometry.attributes.position.needsUpdate = true; // Tell Three.js to update
+            }
+
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize);
+
+        // --- MediaPipe Hands Setup ---
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults((results) => {
+            // Clear canvas for drawing landmarks (optional, if you want to see them)
+            // ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+            // ctx.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
+
+            if (results.multiHandLandmarks) {
+                handLandmarks = results.multiHandLandmarks; // Store landmarks for Three.js
+                for (const landmarks of results.multiHandLandmarks) {
+                    // console.log(landmarks); // You can inspect the landmark data here
+                    // drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
+                    // drawLandmarks(ctx, landmarks, {color: '#FF0000', lineWidth: 2});
+                }
+            } else {
+                handLandmarks = null;
+            }
+        });
+
+        // --- Webcam Setup ---
+        const cameraMP = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+
+        async function setupWebcam() {
+            try {
+                await cameraMP.start();
+                initThreeJS(); // Initialize Three.js after webcam starts
+                cameraInitialized = true;
+                console.log("Webcam started and Three.js initialized.");
+            } catch (error) {
+                console.error("Failed to start webcam or initialize Three.js:", error);
+                alert("无法访问摄像头。请确保您允许浏览器访问摄像头。");
+            }
+        }
+
+        setupWebcam();
+    </script>
+</body>
+</html>
